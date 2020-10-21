@@ -42,21 +42,31 @@ variable "subnetCIDRblock" {
     type = list
     
 }
+variable "privateCIDRblock" {
+    type = list
+    
+}
 variable "destinationCIDRblock" {
     type = string
     
 }
     
-/* variable "ingressCIDRblock" {
+variable "ingressCIDRblock" {
     type = list
-} */
+} 
     
-/* variable "egressCIDRblock" {
+variable "egressCIDRblock" {
     type = list
     
-} */
+}
 variable "mapPublicIP" {
    
     type = bool
     default = true
+}
+variable "source_ami"{
+    type = string
+}
+variable "aws_s3_bucket_name"{
+    type = string
 }

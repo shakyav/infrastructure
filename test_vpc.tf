@@ -20,7 +20,7 @@ terraform {
 } */
 
 provider "aws" {
-  profile = "dev"
+  profile = var.aws_profile_name
   region  = "us-east-1"
 }
 
@@ -168,7 +168,7 @@ resource "aws_security_group" "test_VPC_Security_Group" {
 
 
 resource "aws_iam_role" "role" {
-  name = "test-role"
+  name = "EC2-CSYE6225"
 
   assume_role_policy = <<-EOF
     {
@@ -237,12 +237,14 @@ resource "aws_instance" "test_terraform_ec2_instance" {
   associate_public_ip_address = true
   user_data = <<-EOF
                #!/bin/bash
-               sudo echo export "Bucketname=${aws_s3_bucket.bucket.bucket}" >> /etc/environment
-               sudo echo export "DBhost=${aws_db_instance.rds_ins.address}" >> /etc/environment
+               sudo echo export "Bucket_Name=${aws_s3_bucket.bucket.bucket}" >> /etc/environment
+               sudo echo export "RDS_HOSTNAME=${aws_db_instance.rds_ins.address}" >> /etc/environment
                sudo echo export "DBendpoint=${aws_db_instance.rds_ins.endpoint}" >> /etc/environment
-               sudo echo export "DBname=${aws_db_instance.rds_ins.name}" >> /etc/environment
-               sudo echo export "DBusername=${aws_db_instance.rds_ins.username}" >> /etc/environment
-               sudo echo export "DBpassword=${aws_db_instance.rds_ins.password}" >> /etc/environment
+               sudo echo export "RDS_DB_NAME=${aws_db_instance.rds_ins.name}" >> /etc/environment
+               sudo echo export "RDS_USERNAME=${aws_db_instance.rds_ins.username}" >> /etc/environment
+               sudo echo export "RDS_PASSWORD=${aws_db_instance.rds_ins.password}" >> /etc/environment
+               sudo echo export "AWS_ACCESS_KEY=${var.aws_access_key}" >> /etc/environment
+               sudo echo export "AWS_SECRET_KEY=${var.aws_secret_key}" >> /etc/environment
                EOF
  
   root_block_device {
@@ -262,6 +264,14 @@ resource "aws_s3_bucket" "bucket" {
   acl = "private"
   force_destroy = true
 
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm     = "aws:kms"
+      }
+    }
+  }
+
   lifecycle_rule {
     enabled = true
 
@@ -275,7 +285,7 @@ resource "aws_s3_bucket" "bucket" {
 }
 
 resource "aws_iam_policy" "policy" {
-  name        = "test-policy"
+  name        = "WebAppS3"
   description = "A test policy"
 
   policy = <<EOF
@@ -398,5 +408,11 @@ resource "aws_db_instance" "rds_ins"{
 
 }
 
+
+# dynamo db creation
+
+resource "aws_dynamo_db" "mytable"{
+
+}
 
 # end vpc.tf

@@ -2,14 +2,14 @@
 # this file contains all the variables that will be used to create the vpc such as region,availability zone,
 # dnsSupport, vpcCIDRblock, subnet block
 
-/* variable "access_key" {
+variable "aws_access_key" {
      type = string
      
 }
-variable "secret_key" {
+variable "aws_secret_key" {
      type = string
      
-} */
+}
 variable "region" {
      type = string
      default = "us-east-1"
@@ -68,5 +68,8 @@ variable "source_ami"{
     type = string
 }
 variable "aws_s3_bucket_name"{
+    type = string
+}
+variable "aws_profile_name"{
     type = string
 }

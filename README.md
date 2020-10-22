@@ -2,6 +2,8 @@
 
 Create a VPC with 3 subnets , routing table , internet gateway and create a public route in the public route table created above with destination CIDR block 0.0.0.0/0 and internet gateway created above as the target
 
+Create ec2 instance , iam role and policy , create rds instance , create dynamodb , create s3 bucket which can be accessed by ec2 profile
+
 # Steps to install and setup Terraform on fedora
      
 # - Run the following commands to install 

@@ -194,6 +194,10 @@ resource "aws_iam_role_policy_attachment" "test-attach" {
   policy_arn = aws_iam_policy.policy.arn
 }
 
+resource "aws_iam_instance_profile" "ec2_profile"{
+  name = "ec2_profile"
+  role = "${aws_iam_role.role.name}"
+}
 
 /* resource "aws_subnet" "private-subnet1" {
 
@@ -223,7 +227,7 @@ tags = {
 
 data "aws_ami" "ami"{
   most_recent = true
-  owners = [720038752375]
+  owners = [var.ami_owners_id]
 }
 
 resource "aws_instance" "test_terraform_ec2_instance" {
@@ -235,6 +239,7 @@ resource "aws_instance" "test_terraform_ec2_instance" {
   vpc_security_group_ids = "${aws_security_group.test_VPC_Security_Group.*.id}"
   key_name = "csye6225-fall2020-aws"
   associate_public_ip_address = true
+  iam_instance_profile   = "${aws_iam_instance_profile.ec2_profile.name}"
   user_data = <<-EOF
                #!/bin/bash
                sudo echo export "Bucket_Name=${aws_s3_bucket.bucket.bucket}" >> /etc/environment
@@ -243,8 +248,7 @@ resource "aws_instance" "test_terraform_ec2_instance" {
                sudo echo export "RDS_DB_NAME=${aws_db_instance.rds_ins.name}" >> /etc/environment
                sudo echo export "RDS_USERNAME=${aws_db_instance.rds_ins.username}" >> /etc/environment
                sudo echo export "RDS_PASSWORD=${aws_db_instance.rds_ins.password}" >> /etc/environment
-               sudo echo export "AWS_ACCESS_KEY=${var.aws_access_key}" >> /etc/environment
-               sudo echo export "AWS_SECRET_KEY=${var.aws_secret_key}" >> /etc/environment
+               
                EOF
  
   root_block_device {
@@ -383,22 +387,22 @@ resource "aws_db_instance" "rds_ins"{
 
   db_subnet_group_name = "${aws_db_subnet_group.db-subnet.name}"
 
-  allocated_storage        = 5 # gigabytes
+  allocated_storage        = var.rds_allocated_storage # gigabytes
   
   engine                   = "mysql"
   engine_version           = "8.0.17"
-  identifier               = "csye6225-f20"
+  identifier               = var.rds_dbindentifier
   instance_class           = "db.t3.micro"
   multi_az                 = false
-  name                     = "csye6225"
+  name                     = var.rds_db_name
   
-  password          = "test1234"
+  password          = var.rds_dbpassword
   port                     = 3306
   publicly_accessible = false
   
   /* storage_encrypted        = true # you should always do this */
   storage_type             = "gp2"
-  username                 = "csye6225fall2020"
+  username                 = var.rds_dbusername
   skip_final_snapshot = true
   vpc_security_group_ids   = "${aws_security_group.database.*.id}"
 
@@ -411,8 +415,23 @@ resource "aws_db_instance" "rds_ins"{
 
 # dynamo db creation
 
-resource "aws_dynamo_db" "mytable"{
+resource "aws_dynamodb_table" "dynamodb-table"{
+
+  name = var.dynamo_dbname
+  read_capacity = var.dynamo_read_capacity
+  write_capacity = var.dynamo_write_capacity
+  hash_key = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+  tags = {
+    Name = "${var.dynamo_dbname}"
+  }
 
 }
+
+
 
 # end vpc.tf

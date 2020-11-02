@@ -102,3 +102,9 @@ variable "dynamo_write_capacity"{
 variable "dynamo_dbname"{
     type = string
 }
+variable "domain_Name"{
+    type = string
+}
+/* variable "aws_user_account_id"{
+    type = number
+} */

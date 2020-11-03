@@ -251,6 +251,7 @@ resource "aws_instance" "test_terraform_ec2_instance" {
                sudo echo export "RDS_DB_NAME=${aws_db_instance.rds_ins.name}" >> /etc/environment
                sudo echo export "RDS_USERNAME=${aws_db_instance.rds_ins.username}" >> /etc/environment
                sudo echo export "RDS_PASSWORD=${aws_db_instance.rds_ins.password}" >> /etc/environment
+               sudo echo export "REGION=${var.region}" >> /etc/environment
                
                EOF
 
@@ -260,8 +261,16 @@ resource "aws_instance" "test_terraform_ec2_instance" {
     delete_on_termination = true
   }
   depends_on = [aws_s3_bucket.bucket, aws_db_instance.rds_ins]
+  tags = {
+    "Name" = "myEC2Instance"
+  }
 
 }
+
+/* data "http" "myip"{
+  url = "http://${aws_instance.test_terraform_ec2_instance.public_ip}:8080/v1/*"
+  
+} */
 
 
 # s3 buckket creation
@@ -301,7 +310,11 @@ resource "aws_iam_policy" "policy" {
     "Statement": [
         {
             "Action": [
-                "s3:*"
+                "s3:Get*",
+                "s3:List*",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:DeleteObjectVersion"
             ],
             "Effect": "Allow",
             "Resource": [
@@ -476,11 +489,14 @@ resource "aws_iam_policy" "gh_upload_s3" {
         {
             "Effect": "Allow",
             "Action": [
-                "s3:PutObject",
-                "s3:Get*",
-                "s3:List*"
+                  "s3:Get*",
+                  "s3:List*",
+                  "s3:PutObject",
+                  "s3:DeleteObject",
+                  "s3:DeleteObjectVersion"
             ],
             "Resource": [
+                "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}",
                 "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}/*"
               ]
         }
@@ -623,7 +639,7 @@ resource "aws_codedeploy_deployment_group" "code_deploy_deployment_group" {
   deployment_group_name  = "csye6225-webapp-deployment"
   deployment_config_name = "CodeDeployDefault.AllAtOnce"
   service_role_arn       = "${aws_iam_role.code_deploy_role.arn}"
-  
+
 
 
 
@@ -643,10 +659,6 @@ resource "aws_codedeploy_deployment_group" "code_deploy_deployment_group" {
     events  = ["DEPLOYMENT_FAILURE"]
   }
 
-  alarm_configuration {
-    alarms  = ["Deployment-Alarm"]
-    enabled = true
-  }
 
   depends_on = [aws_codedeploy_app.code_deploy_app]
 }
@@ -676,25 +688,21 @@ resource "aws_iam_user_policy_attachment" "ghactions_s3_policy_attach" {
 
 
 resource "aws_iam_user_policy_attachment" "ghactions_codedeploy_policy_attach" {
-  user = "ghactions"
+  user       = "ghactions"
   policy_arn = "${aws_iam_policy.GH_Code_Deploy.arn}"
 }
 
-
-/* data "aws_route53_zone" "route53" {
-  name         = "${var.aws_profile_name}.${var.domain_Name}."
-  # private_zone = false
+# add/update the DNS record api.dev.yourdomainname.tld. to the public IP address of the EC2 instance 
+data "aws_route53_zone" "selected" {
+  name         = "${var.aws_profile_name}.${var.domain_Name}"
+  private_zone = false
 }
 
-resource "aws_route53_record" "recordset" {
-  zone_id = "${data.aws_route53_zone.route53.zone_id}"
-  name    = "${data.aws_route53_zone.route53.name}"
+resource "aws_route53_record" "www" {
+  zone_id = data.aws_route53_zone.selected.zone_id
+  name    = "api.${data.aws_route53_zone.selected.name}"
   type    = "A"
-
-  alias {
-    name    = "${aws_lb.appLoadbalancer.dns_name}"
-    zone_id = "${aws_lb.appLoadbalancer.zone_id}"
-    evaluate_target_health = true
-  }
-} */
+  ttl     = "300"
+  records = ["${aws_instance.test_terraform_ec2_instance.public_ip}"]
+}
 # end vpc.tf

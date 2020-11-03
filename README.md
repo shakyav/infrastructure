@@ -4,6 +4,24 @@ Create a VPC with 3 subnets , routing table , internet gateway and create a publ
 
 Create ec2 instance , iam role and policy , create rds instance , create dynamodb , create s3 bucket which can be accessed by ec2 profile
 
+CREATE HOSTED ZONE FOR DOMAIN IN ROOT AWS ACCOUNT
+
+CREATE SUBDOMAIN & HOSTED ZONE FOR DEV AWS ACCOUNT
+
+CREATE SUBDOMAIN & HOSTED ZONE FOR PROD AWS ACCOUNT
+
+Create IAM User for CI/CD
+
+Create S3 bucket for CodeDeploy
+
+Create CodeDeploy Application Resource
+
+Create CodeDeploy Deployment Group Resource
+
+Add/update the DNS record api.dev.yourdomainname.tld. to the public IP address of the EC2 instance when using the DEV/Prod AWS account.
+
+Create AWS CodeDeploy appspec.yml to deploy your application on EC2 instances. The appspec.yml file should be in root of your repository.
+
 # Steps to install and setup Terraform on fedora
      
 # - Run the following commands to install 
@@ -34,4 +52,5 @@ Create ec2 instance , iam role and policy , create rds instance , create dynamod
                  - terraform apply -var-file="variables.tfvars"
          15. Destroy the created infrastructure
                  - terraform destroy -var-file="variables.tfvars"
+         
              

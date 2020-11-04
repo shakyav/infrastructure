@@ -702,7 +702,7 @@ resource "aws_route53_record" "www" {
   zone_id = data.aws_route53_zone.selected.zone_id
   name    = "api.${data.aws_route53_zone.selected.name}"
   type    = "A"
-  ttl     = "300"
+  ttl     = "60"
   records = ["${aws_instance.test_terraform_ec2_instance.public_ip}"]
 }
 # end vpc.tf

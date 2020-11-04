@@ -471,8 +471,8 @@ resource "aws_iam_role_policy" "CodeDeploy_EC2_S3" {
       ],
       "Effect": "Allow",
       "Resource": [
-        "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}/*",
-        "arn:aws:s3:::webapp.${var.aws_profile_name}.${var.domain_Name}/*"
+        "arn:aws:s3:::codedeploy.prod1.${var.domain_Name}/*",
+        "arn:aws:s3:::webapp.prod1.${var.domain_Name}/*"
       ]
     }
   ]
@@ -496,8 +496,8 @@ resource "aws_iam_policy" "gh_upload_s3" {
                   "s3:DeleteObjectVersion"
             ],
             "Resource": [
-                "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}",
-                "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}/*"
+                "arn:aws:s3:::codedeploy.prod1.${var.domain_Name}",
+                "arn:aws:s3:::codedeploy.prod1.${var.domain_Name}/*"
               ]
         }
     ]
@@ -702,7 +702,7 @@ resource "aws_route53_record" "www" {
   zone_id = data.aws_route53_zone.selected.zone_id
   name    = "api.${data.aws_route53_zone.selected.name}"
   type    = "A"
-  ttl     = "300"
+  ttl     = "60"
   records = ["${aws_instance.test_terraform_ec2_instance.public_ip}"]
 }
 # end vpc.tf

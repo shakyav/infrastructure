@@ -471,8 +471,8 @@ resource "aws_iam_role_policy" "CodeDeploy_EC2_S3" {
       ],
       "Effect": "Allow",
       "Resource": [
-        "arn:aws:s3:::codedeploy.prod1.${var.domain_Name}/*",
-        "arn:aws:s3:::webapp.prod1.${var.domain_Name}/*"
+        "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}/*",
+        "arn:aws:s3:::webapp.${var.aws_profile_name}.${var.domain_Name}/*"
       ]
     }
   ]
@@ -496,8 +496,8 @@ resource "aws_iam_policy" "gh_upload_s3" {
                   "s3:DeleteObjectVersion"
             ],
             "Resource": [
-                "arn:aws:s3:::codedeploy.prod1.${var.domain_Name}",
-                "arn:aws:s3:::codedeploy.prod1.${var.domain_Name}/*"
+                "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}",
+                "arn:aws:s3:::codedeploy.${var.aws_profile_name}.${var.domain_Name}/*"
               ]
         }
     ]

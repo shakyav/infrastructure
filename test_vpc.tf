@@ -705,4 +705,17 @@ resource "aws_route53_record" "www" {
   ttl     = "60"
   records = ["${aws_instance.test_terraform_ec2_instance.public_ip}"]
 }
+
+resource "aws_iam_role_policy_attachment" "AmazonCloudWatchAgent" {
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  role       = "${aws_iam_role.role.name}"
+}
+
+
+resource "aws_iam_role_policy_attachment" "AmazonSSMAgent" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  role       = "${aws_iam_role.role.name}"
+}
 # end vpc.tf
+
+

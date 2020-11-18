@@ -267,6 +267,34 @@ resource "aws_instance" "test_terraform_ec2_instance" {
 
 }
 
+
+resource "aws_launch_configuration" "as_conf" {
+  name                   = "asg_launch_config"
+  image_id               = "${data.aws_ami.ami.id}"
+  instance_type          = "t2.micro"
+  security_groups        = ["${aws_security_group.test_VPC_Security_Group.id}"]
+  key_name               = "csye6225-fall2020-aws"
+  iam_instance_profile        = "${aws_iam_instance_profile.ec2_profile.name}"
+  user_data                   = <<-EOF
+               #!/bin/bash
+               sudo echo export "Bucket_Name=${aws_s3_bucket.bucket.bucket}" >> /etc/environment
+               sudo echo export "RDS_HOSTNAME=${aws_db_instance.rds_ins.address}" >> /etc/environment
+               sudo echo export "DBendpoint=${aws_db_instance.rds_ins.endpoint}" >> /etc/environment
+               sudo echo export "RDS_DB_NAME=${aws_db_instance.rds_ins.name}" >> /etc/environment
+               sudo echo export "RDS_USERNAME=${aws_db_instance.rds_ins.username}" >> /etc/environment
+               sudo echo export "RDS_PASSWORD=${aws_db_instance.rds_ins.password}" >> /etc/environment
+               sudo echo export "REGION=${var.region}" >> /etc/environment
+               
+               EOF
+
+  root_block_device {
+    volume_type           = "gp2"
+    volume_size           = 20
+    delete_on_termination = true
+  }
+  depends_on = [aws_s3_bucket.bucket, aws_db_instance.rds_ins]
+}
+
 /* data "http" "myip"{
   url = "http://${aws_instance.test_terraform_ec2_instance.public_ip}:8080/v1/*"
   
@@ -698,12 +726,24 @@ data "aws_route53_zone" "selected" {
   private_zone = false
 }
 
-resource "aws_route53_record" "www" {
+/*resource "aws_route53_record" "www" {
   zone_id = data.aws_route53_zone.selected.zone_id
   name    = "api.${data.aws_route53_zone.selected.name}"
   type    = "A"
   ttl     = "60"
   records = ["${aws_instance.test_terraform_ec2_instance.public_ip}"]
+}*/
+
+resource "aws_route53_record" "www" {
+  zone_id = data.aws_route53_zone.selected.zone_id
+  name    = "api.${data.aws_route53_zone.selected.name}"
+  type    = "A"
+
+   alias {
+    name    = "${aws_lb.applicationLoadBalancer.dns_name}"
+    zone_id = "${aws_lb.applicationLoadBalancer.zone_id}"
+    evaluate_target_health = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonCloudWatchAgent" {
@@ -716,6 +756,147 @@ resource "aws_iam_role_policy_attachment" "AmazonSSMAgent" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
   role       = "${aws_iam_role.role.name}"
 }
+
+
+
+#Autoscaling Group
+resource "aws_autoscaling_group" "autoscaling" {
+  name                 = "terraform-asg-example"
+  launch_configuration = "${aws_launch_configuration.asg_launch_config.name}"
+  min_size             = 3
+  max_size             = 5
+  default_cooldown     = 60
+  desired_capacity     = 3
+  vpc_zone_identifier = ["${aws_subnet.test_VPC_Subnet[0].id}"]
+  target_group_arns = ["${aws_lb_target_group.albTargetGroup.arn}"]
+  tag {
+    key                 = "Name"
+    value               = "myEC2Instance"
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_lb_target_group" "albTargetGroup" {
+  name     = "albTargetGroup"
+  port     = "8080"
+  protocol = "HTTP"
+  vpc_id   = "${aws_vpc.test_VPC.id}"
+  tags = {
+    name = "albTargetGroup"
+  }
+  health_check {
+    healthy_threshold   = 3
+    unhealthy_threshold = 5
+    timeout             = 5
+    interval            = 30
+    path                = "/healthstatus"
+    port                = "8080"
+    matcher             = "200"
+  }
+}
+
+#Autoscalling Policy
+resource "aws_autoscaling_policy" "WebServerScaleUpPolicy" {
+  name                   = "WebServerScaleUpPolicy"
+  adjustment_type        = "ChangeInCapacity"
+  autoscaling_group_name = "${aws_autoscaling_group.autoscaling.name}"
+  cooldown               = 60
+  scaling_adjustment     = 1
+}
+
+resource "aws_autoscaling_policy" "WebServerScaleDownPolicy" {
+  name                   = "WebServerScaleDownPolicy"
+  adjustment_type        = "ChangeInCapacity"
+  autoscaling_group_name = "${aws_autoscaling_group.autoscaling.name}"
+  cooldown               = 60
+  scaling_adjustment     = -1
+}
+
+resource "aws_cloudwatch_metric_alarm" "CPUAlarmHigh" {
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  statistic           = "Average"
+  period              = "300"
+  evaluation_periods  = "2"
+  threshold           = "90"
+  alarm_name          = "CPUAlarmHigh"
+  comparison_operator = "GreaterThanThreshold"
+  dimensions = {
+  AutoScalingGroupName = "${aws_autoscaling_group.autoscaling.name}"
+  }
+  alarm_description = "Scale-up if CPU > 90% for 10 minutes"
+  alarm_actions     = ["${aws_autoscaling_policy.WebServerScaleUpPolicy.arn}"]
+}
+
+resource "aws_cloudwatch_metric_alarm" "CPUAlarmLow" {
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  statistic           = "Average"
+  period              = "300"
+  evaluation_periods  = "2"
+  threshold           = "70"
+  alarm_name          = "CPUAlarmLow"
+  comparison_operator = "LessThanThreshold"
+  dimensions = {
+    AutoScalingGroupName = "${aws_autoscaling_group.autoscaling.name}"
+  }
+  alarm_description = "Scale-down if CPU < 70% for 10 minutes"
+  alarm_actions     = ["${aws_autoscaling_policy.WebServerScaleDownPolicy.arn}"]
+}
+
+#Load Balancer Security Group
+resource "aws_security_group" "loadBalancer" {
+  name   = "loadBalancer_security_group"
+  vpc_id = "${aws_vpc.test_VPC.id}"
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+    ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name        = "LoadBalancer Security Group"
+    Environment = "${var.aws_profile_name}"
+  }
+}
+
+
+#Load balancer
+resource "aws_lb" "applicationLoadBalancer" {
+  name               = "applicationLoadBalancer"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = ["${aws_security_group.loadBalancer.id}"]
+  subnets            = "${aws_subnet.test_VPC_Subnet.*.id}"
+  ip_address_type    = "ipv4"
+  tags = {
+    Environment = "${var.profile}"
+    Name        = "applicationLoadBalancer"
+  }
+}
+
+resource "aws_lb_listener" "webappListener" {
+  load_balancer_arn = "${aws_lb.applicationLoadBalancer.arn}"
+  port              = "80"
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = "${aws_lb_target_group.albTargetGroup.arn}"
+  }
+}
+
 # end vpc.tf
 
 

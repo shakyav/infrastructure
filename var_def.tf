@@ -105,6 +105,30 @@ variable "dynamo_dbname"{
 variable "domain_Name"{
     type = string
 }
+variable "alarm_low_evaluation_period"{
+    type = string
+
+}
+variable "alarm_high_evaluation_period"{
+    type = string
+
+}
+variable "alarm_low_period"{
+    type = string
+
+}
+variable "alarm_high_period"{
+    type = string
+
+}
+variable "alarm_low_threshold"{
+    type = string
+
+}
+variable "alarm_high_threshold"{
+    type = string
+
+}
 /* variable "aws_user_account_id"{
     type = number
 } */

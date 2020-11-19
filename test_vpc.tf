@@ -305,96 +305,6 @@ resource "aws_launch_configuration" "as_conf" {
 } */
 
 
-#Autoscaling Group
-resource "aws_autoscaling_group" "autoscaling" {
-  name                 = "autoscaling-group"
-  launch_configuration = "${aws_launch_configuration.as_conf.name}"
-  min_size             = 3
-  max_size             = 5
-  default_cooldown     = 60
-  desired_capacity     = 3
-  vpc_zone_identifier = ["${aws_subnet.test_VPC_Subnet[0].id}"]
-  target_group_arns = ["${aws_lb_target_group.albTargetGroup.arn}"]
-  tag {
-    key                 = "Name"
-    value               = "myEC2Instance"
-    propagate_at_launch = true
-  }
-}
-# load balancer target group
-resource "aws_lb_target_group" "albTargetGroup" {
-  name     = "albTargetGroup"
-  port     = "8080"
-  protocol = "HTTP"
-  vpc_id   = "${aws_vpc.test_VPC.id}"
-  tags = {
-    name = "albTargetGroup"
-  }
-  health_check {
-    healthy_threshold   = 3
-    unhealthy_threshold = 5
-    timeout             = 5
-    interval            = 30
-    path                = "/healthstatus"
-    port                = "8080"
-    matcher             = "200"
-  }
-}
-
-#Autoscalling Policy
-resource "aws_autoscaling_policy" "WebServerScaleUpPolicy" {
-  name                   = "WebServerScaleUpPolicy"
-  adjustment_type        = "ChangeInCapacity"
-  autoscaling_group_name = "${aws_autoscaling_group.autoscaling.name}"
-  cooldown               = 60
-  scaling_adjustment     = 1
-}
-
-resource "aws_autoscaling_policy" "WebServerScaleDownPolicy" {
-  name                   = "WebServerScaleDownPolicy"
-  adjustment_type        = "ChangeInCapacity"
-  autoscaling_group_name = "${aws_autoscaling_group.autoscaling.name}"
-  cooldown               = 60
-  scaling_adjustment     = -1
-}
-
-resource "aws_cloudwatch_metric_alarm" "CPUAlarmLow" {
-  alarm_description = "Scale-down if CPU < 70% for 10 minutes"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/EC2"
-  statistic           = "Average"
-  period              = "${var.alarm_low_period}"
-  evaluation_periods  = "${var.alarm_low_evaluation_period}"
-  threshold           = "${var.alarm_low_threshold}"
-  alarm_name          = "CPUAlarmLow"
-  alarm_actions     = ["${aws_autoscaling_policy.WebServerScaleDownPolicy.arn}"]
-  dimensions = {
-    AutoScalingGroupName = "${aws_autoscaling_group.autoscaling.name}"
-  }
-  comparison_operator = "LessThanThreshold"
- 
-  
-}
-
-resource "aws_cloudwatch_metric_alarm" "CPUAlarmHigh" {
-  alarm_description = "Scale-up if CPU > 90% for 10 minutes"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/EC2"
-  statistic           = "Average"
-  period              = "${var.alarm_high_period}"
-  evaluation_periods  = "${var.alarm_high_evaluation_period}"
-  threshold           = "${var.alarm_high_threshold}"
-  alarm_name          = "CPUAlarmHigh"
-  alarm_actions     = ["${aws_autoscaling_policy.WebServerScaleUpPolicy.arn}"]
-  dimensions = {
-  AutoScalingGroupName = "${aws_autoscaling_group.autoscaling.name}"
-  }
-  comparison_operator = "GreaterThanThreshold"
- 
-  
-}
-
-
 # s3 buckket creation
 
 resource "aws_s3_bucket" "bucket" {
@@ -852,6 +762,94 @@ resource "aws_iam_role_policy_attachment" "AmazonSSMAgent" {
 
 
 
+#Autoscaling Group
+resource "aws_autoscaling_group" "autoscaling" {
+  name                 = "autoscaling-group"
+  launch_configuration = "${aws_launch_configuration.as_conf.name}"
+  min_size             = 3
+  max_size             = 5
+  default_cooldown     = 60
+  desired_capacity     = 3
+  vpc_zone_identifier = ["${aws_subnet.test_VPC_Subnet[0].id}"]
+  target_group_arns = ["${aws_lb_target_group.albTargetGroup.arn}"]
+  tag {
+    key                 = "Name"
+    value               = "myEC2Instance"
+    propagate_at_launch = true
+  }
+}
+# load balancer target group
+resource "aws_lb_target_group" "albTargetGroup" {
+  name     = "albTargetGroup"
+  port     = "8080"
+  protocol = "HTTP"
+  vpc_id   = "${aws_vpc.test_VPC.id}"
+  tags = {
+    name = "albTargetGroup"
+  }
+  health_check {
+    healthy_threshold   = 3
+    unhealthy_threshold = 5
+    timeout             = 5
+    interval            = 30
+    path                = "/healthstatus"
+    port                = "8080"
+    matcher             = "200"
+  }
+}
+
+#Autoscalling Policy
+resource "aws_autoscaling_policy" "WebServerScaleUpPolicy" {
+  name                   = "WebServerScaleUpPolicy"
+  adjustment_type        = "ChangeInCapacity"
+  autoscaling_group_name = "${aws_autoscaling_group.autoscaling.name}"
+  cooldown               = 60
+  scaling_adjustment     = 1
+}
+
+resource "aws_autoscaling_policy" "WebServerScaleDownPolicy" {
+  name                   = "WebServerScaleDownPolicy"
+  adjustment_type        = "ChangeInCapacity"
+  autoscaling_group_name = "${aws_autoscaling_group.autoscaling.name}"
+  cooldown               = 60
+  scaling_adjustment     = -1
+}
+
+resource "aws_cloudwatch_metric_alarm" "CPUAlarmLow" {
+  alarm_description = "Scale-down if CPU < 70% for 10 minutes"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  statistic           = "Average"
+  period              = "${var.alarm_low_period}"
+  evaluation_periods  = "${var.alarm_low_evaluation_period}"
+  threshold           = "${var.alarm_low_threshold}"
+  alarm_name          = "CPUAlarmLow"
+  alarm_actions     = ["${aws_autoscaling_policy.WebServerScaleDownPolicy.arn}"]
+  dimensions = {
+    AutoScalingGroupName = "${aws_autoscaling_group.autoscaling.name}"
+  }
+  comparison_operator = "LessThanThreshold"
+ 
+  
+}
+
+resource "aws_cloudwatch_metric_alarm" "CPUAlarmHigh" {
+  alarm_description = "Scale-up if CPU > 90% for 10 minutes"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  statistic           = "Average"
+  period              = "${var.alarm_high_period}"
+  evaluation_periods  = "${var.alarm_high_evaluation_period}"
+  threshold           = "${var.alarm_high_threshold}"
+  alarm_name          = "CPUAlarmHigh"
+  alarm_actions     = ["${aws_autoscaling_policy.WebServerScaleUpPolicy.arn}"]
+  dimensions = {
+  AutoScalingGroupName = "${aws_autoscaling_group.autoscaling.name}"
+  }
+  comparison_operator = "GreaterThanThreshold"
+ 
+  
+}
 
 
 

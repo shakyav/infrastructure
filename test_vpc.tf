@@ -906,6 +906,215 @@ resource "aws_lb_listener" "webapp-Listener" {
   }
 }
 
+
+resource "aws_iam_policy" "ghAction-Lambda" {
+  name   = "ghAction_s3_policy_lambda"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "lambda:*"
+        ],
+        
+      "Resource": "arn:aws:lambda:${var.region}:${local.aws_user_account_id}:function:${aws_lambda_function.sns_lambda_email.function_name}"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_user_policy_attachment" "ghAction_lambda_policy_attach" {
+  user       = "ghactions"
+  policy_arn = "${aws_iam_policy.ghAction-Lambda.arn}"
+}
+
+
+#SNS topic and policies
+resource "aws_sns_topic" "sns_recipes" {
+  name = "email_request"
+}
+
+resource "aws_sns_topic_policy" "sns_recipes_policy" {
+  arn    = "${aws_sns_topic.sns_recipes.arn}"
+  policy = "${data.aws_iam_policy_document.sns-topic-policy.json}"
+}
+
+data "aws_iam_policy_document" "sns-topic-policy" {
+  policy_id = "__default_policy_ID"
+
+  statement {
+    actions = [
+      "SNS:Subscribe",
+      "SNS:SetTopicAttributes",
+      "SNS:RemovePermission",
+      "SNS:Receive",
+      "SNS:Publish",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:GetTopicAttributes",
+      "SNS:DeleteTopic",
+      "SNS:AddPermission",
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceOwner"
+
+      values = [
+        "${local.aws_user_account_id}",
+      ]
+    }
+
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    resources = [
+      "${aws_sns_topic.sns_recipes.arn}",
+    ]
+
+    sid = "__default_statement_ID"
+  }
+}
+
+# IAM policy for SNS
+resource "aws_iam_policy" "sns_iam_policy" {
+  name   = "ec2_iam_policy"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "SNS:Publish"
+      ],
+      "Resource": "${aws_sns_topic.sns_recipes.arn}"
+    }
+  ]
+}
+EOF
+}
+
+# Attach the SNS topic policy to the EC2 role
+resource "aws_iam_role_policy_attachment" "ec2_sns" {
+  policy_arn = "${aws_iam_policy.sns_iam_policy.arn}"
+  role       = "${aws_iam_role.role.name}"
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "index.js"
+  output_path = "lambda_function.zip"
+}
+
+#Lambda Function
+resource "aws_lambda_function" "sns_lambda_email" {
+  s3_bucket = "codedeploy.prod.shakyav.me"
+  s3_key    = "lambda_function.zip"
+  /* filename         = "lambda_function.zip" */
+  function_name    = "lambda_function_name"
+  role             = "${aws_iam_role.iam_for_lambda.arn}"
+  handler          = "index.handler"
+  runtime          = "nodejs12.x"
+  /* source_code_hash = "${data.archive_file.lambda_zip.output_base64sha256}" */
+  environment {
+    variables = {
+      timeToLive = "300"
+    }
+  }
+}
+
+#SNS topic subscription to Lambda
+resource "aws_sns_topic_subscription" "lambda" {
+  topic_arn = "${aws_sns_topic.sns_recipes.arn}"
+  protocol  = "lambda"
+  endpoint  = "${aws_lambda_function.sns_lambda_email.arn}"
+}
+
+#SNS Lambda permission
+resource "aws_lambda_permission" "with_sns" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.sns_lambda_email.function_name}"
+  principal     = "sns.amazonaws.com"
+  source_arn    = "${aws_sns_topic.sns_recipes.arn}"
+}
+
+#Lambda Policy
+resource "aws_iam_policy" "lambda_policy" {
+  name        = "lambda_policy"
+  description = "Policy for cloud watch and code deploy"
+  policy      = <<EOF
+{
+   "Version": "2012-10-17",
+   "Statement": [
+       {
+           "Effect": "Allow",
+           "Action": [
+               "logs:CreateLogGroup",
+               "logs:CreateLogStream",
+               "logs:PutLogEvents"
+           ],
+           "Resource": "*"
+       },
+       {
+         "Sid": "LambdaDynamoDBAccess",
+         "Effect": "Allow",
+         "Action": [
+             "dynamodb:GetItem",
+             "dynamodb:PutItem",
+             "dynamodb:UpdateItem"
+         ],
+         "Resource": "arn:aws:dynamodb:${var.aws_profile_name}:${local.aws_user_account_id}:table/csye6225"
+       },
+       {
+         "Sid": "LambdaSESAccess",
+         "Effect": "Allow",
+         "Action": [
+             "ses:VerifyEmailAddress",
+             "ses:SendEmail",
+             "ses:SendRawEmail"
+         ],
+         "Resource": "*"
+       }
+   ]
+}
+ EOF
+}
+
+#IAM Role for lambda with sns
+resource "aws_iam_role" "iam_for_lambda" {
+  name = "iam_for_lambda"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+#Attach the policy for Lambda iam role
+resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
+  role       = "${aws_iam_role.iam_for_lambda.name}"
+  policy_arn = "${aws_iam_policy.lambda_policy.arn}"
+}
+
 # end 
 
 

@@ -907,7 +907,7 @@ resource "aws_lb_listener" "webapp-Listener" {
 }
 
 
-resource "aws_iam_policy" "ghAction-Lambda" {
+resource "aws_iam_policy" "ghactions-lambda-policy" {
   name   = "ghAction_s3_policy_lambda"
   policy = <<EOF
 {
@@ -926,19 +926,19 @@ resource "aws_iam_policy" "ghAction-Lambda" {
 EOF
 }
 
-resource "aws_iam_user_policy_attachment" "ghAction_lambda_policy_attach" {
+resource "aws_iam_user_policy_attachment" "ghactions_aws_lambda_policy_attach" {
   user       = "ghactions"
-  policy_arn = "${aws_iam_policy.ghAction-Lambda.arn}"
+  policy_arn = "${aws_iam_policy.ghactions-lambda-policy.arn}"
 }
 
 
 #SNS topic and policies
-resource "aws_sns_topic" "sns_recipes" {
+resource "aws_sns_topic" "sns_email" {
   name = "email_request"
 }
 
-resource "aws_sns_topic_policy" "sns_recipes_policy" {
-  arn    = "${aws_sns_topic.sns_recipes.arn}"
+resource "aws_sns_topic_policy" "sns_email_policy" {
+  arn    = "${aws_sns_topic.sns_email.arn}"
   policy = "${data.aws_iam_policy_document.sns-topic-policy.json}"
 }
 
@@ -975,7 +975,7 @@ data "aws_iam_policy_document" "sns-topic-policy" {
     }
 
     resources = [
-      "${aws_sns_topic.sns_recipes.arn}",
+      "${aws_sns_topic.sns_email.arn}",
     ]
 
     sid = "__default_statement_ID"
@@ -994,7 +994,7 @@ resource "aws_iam_policy" "sns_iam_policy" {
       "Action": [
         "SNS:Publish"
       ],
-      "Resource": "${aws_sns_topic.sns_recipes.arn}"
+      "Resource": "${aws_sns_topic.sns_email.arn}"
     }
   ]
 }
@@ -1002,7 +1002,7 @@ EOF
 }
 
 # Attach the SNS topic policy to the EC2 role
-resource "aws_iam_role_policy_attachment" "ec2_sns" {
+resource "aws_iam_role_policy_attachment" "ec2_instance_sns" {
   policy_arn = "${aws_iam_policy.sns_iam_policy.arn}"
   role       = "${aws_iam_role.role.name}"
 }
@@ -1025,31 +1025,31 @@ resource "aws_lambda_function" "sns_lambda_email" {
   /* source_code_hash = "${data.archive_file.lambda_zip.output_base64sha256}" */
   environment {
     variables = {
-      timeToLive = "300"
+      timeToLive = "5"
     }
   }
 }
 
 #SNS topic subscription to Lambda
 resource "aws_sns_topic_subscription" "lambda" {
-  topic_arn = "${aws_sns_topic.sns_recipes.arn}"
+  topic_arn = "${aws_sns_topic.sns_email.arn}"
   protocol  = "lambda"
   endpoint  = "${aws_lambda_function.sns_lambda_email.arn}"
 }
 
 #SNS Lambda permission
-resource "aws_lambda_permission" "with_sns" {
+resource "aws_lambda_permission" "lambda_sns" {
   statement_id  = "AllowExecutionFromSNS"
   action        = "lambda:InvokeFunction"
   function_name = "${aws_lambda_function.sns_lambda_email.function_name}"
   principal     = "sns.amazonaws.com"
-  source_arn    = "${aws_sns_topic.sns_recipes.arn}"
+  source_arn    = "${aws_sns_topic.sns_email.arn}"
 }
 
 #Lambda Policy
-resource "aws_iam_policy" "lambda_policy" {
-  name        = "lambda_policy"
-  description = "Policy for cloud watch and code deploy"
+resource "aws_iam_policy" "aws_lambda_policy" {
+  name        = "aws_lambda_policy"
+  description = "Lambda Policy for dynamo ses and cloudwatch logs"
   policy      = <<EOF
 {
    "Version": "2012-10-17",
@@ -1071,7 +1071,7 @@ resource "aws_iam_policy" "lambda_policy" {
              "dynamodb:PutItem",
              "dynamodb:UpdateItem"
          ],
-         "Resource": "arn:aws:dynamodb:${var.aws_profile_name}:${local.aws_user_account_id}:table/csye6225"
+         "Resource": "arn:aws:dynamodb:${var.region}:${local.aws_user_account_id}:table/csye6225"
        },
        {
          "Sid": "LambdaSESAccess",
@@ -1088,7 +1088,7 @@ resource "aws_iam_policy" "lambda_policy" {
  EOF
 }
 
-#IAM Role for lambda with sns
+#IAM role for lambda sns
 resource "aws_iam_role" "iam_for_lambda" {
   name = "iam_for_lambda"
 
@@ -1109,10 +1109,10 @@ resource "aws_iam_role" "iam_for_lambda" {
 EOF
 }
 
-#Attach the policy for Lambda iam role
-resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
+#attach lambda policy with lambda role
+resource "aws_iam_role_policy_attachment" "attach_lambda_policy_to_lambda_role" {
   role       = "${aws_iam_role.iam_for_lambda.name}"
-  policy_arn = "${aws_iam_policy.lambda_policy.arn}"
+  policy_arn = "${aws_iam_policy.aws_lambda_policy.arn}"
 }
 
 # end 

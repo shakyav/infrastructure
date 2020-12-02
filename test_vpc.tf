@@ -291,6 +291,7 @@ resource "aws_launch_configuration" "as_conf" {
                sudo echo export "PROFILE_AWS=${var.aws_profile_name}">> /etc/environment
                sudo echo export "NAME_DOMAIN=${var.domain_Name}" >> /etc/environment
                sudo echo export "SNS_TOPIC_ARN=${aws_sns_topic.sns_email.arn}" >> /etc/environment
+               sudo echo export "DYNAMO_DB_TABLE=${var.dynamo_dbname}" >> /etc/environment
                
                EOF
 
@@ -1016,6 +1017,18 @@ data "archive_file" "lambda_zip" {
   output_path = "lambda_function.zip"
 }
 
+resource "aws_s3_bucket_object" "object" {
+  bucket = "codedeploy.prod.shakyav.me"
+  key    = "lambda_function.zip"
+  source = "/home/vivekshakya/cloud-assignments/infrastructure/lambda_function.zip"
+  depends_on = [data.archive_file.lambda_zip]
+
+  # The filemd5() function is available in Terraform 0.11.12 and later
+  # For Terraform 0.11.11 and earlier, use the md5() function and the file() function:
+  # etag = "${md5(file("path/to/file"))}"
+  #etag = filemd5("/home/vivekshakya/cloud-assignments/infrastructure/lambda_function.zip")
+}
+
 #Lambda Function
 resource "aws_lambda_function" "sns_lambda_email" {
   s3_bucket = "codedeploy.prod.shakyav.me"
@@ -1031,6 +1044,7 @@ resource "aws_lambda_function" "sns_lambda_email" {
       timeToLive = "5"
     }
   }
+   depends_on = [aws_s3_bucket_object.object]
 }
 
 #SNS topic subscription to Lambda

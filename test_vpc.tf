@@ -288,6 +288,9 @@ resource "aws_launch_configuration" "as_conf" {
                sudo echo export "RDS_USERNAME=${aws_db_instance.rds_ins.username}" >> /etc/environment
                sudo echo export "RDS_PASSWORD=${aws_db_instance.rds_ins.password}" >> /etc/environment
                sudo echo export "REGION=${var.region}" >> /etc/environment
+               sudo echo export "PROFILE_AWS=${var.aws_profile_name}">> /etc/environment
+               sudo echo export "NAME_DOMAIN=${var.domain_Name}" >> /etc/environment
+               sudo echo export "SNS_TOPIC_ARN=${aws_sns_topic.sns_email.arn}" >> /etc/environment
                
                EOF
 

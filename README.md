@@ -53,4 +53,20 @@ Create AWS CodeDeploy appspec.yml to deploy your application on EC2 instances. T
          15. Destroy the created infrastructure
                  - terraform destroy -var-file="variables.tfvars"
          
-             
+# - Import certificates into aws certificate manager
+
+    # Refer the Link to view the prerequisites for importing a certificate 
+        - https://docs.aws.amazon.com/acm/latest/userguide/import-certificate-prerequisites.html
+    
+    # Refer the link to view the certificate format
+        - https://docs.aws.amazon.com/acm/latest/userguide/import-certificate-format.html
+
+    # Refer this link to view the different ways to import certificate into aws certificate manager
+        - https://docs.aws.amazon.com/acm/latest/userguide/import-certificate-api-cli.html
+        
+    # Command to import the certificate from CLI
+
+        - $ aws acm import-certificate --certificate fileb://Certificate.pem \
+            --certificate-chain fileb://CertificateChain.pem \
+            --private-key fileb://PrivateKey.pem 	
+    

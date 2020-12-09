@@ -126,14 +126,7 @@ resource "aws_security_group" "test_VPC_Security_Group" {
     protocol    = "tcp"
   }
 
-  # allow ingress of port 80
-  ingress {
-    /* cidr_blocks = "${var.ingressCIDRblock}" */
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    security_groups = ["${aws_security_group.loadBalancer.id}"]
-  }
+ 
 
   # allow ingress of port 443
   ingress {
@@ -432,7 +425,20 @@ resource "aws_security_group_rule" "test_VPC_Security_Group" {
 
 }
 
+# rds parameter group to turn the performance_schema on 
 
+resource "aws_db_parameter_group" "default" {
+  name   = "rds-mysql"
+  family = "mysql8.0"
+
+  parameter {
+    name  = "performance_schema"
+    value = true
+    apply_method = "pending-reboot"
+  }
+ 
+
+}
 
 
 resource "aws_db_instance" "rds_ins" {
@@ -440,11 +446,12 @@ resource "aws_db_instance" "rds_ins" {
   db_subnet_group_name = "${aws_db_subnet_group.db-subnet.name}"
 
   allocated_storage = var.rds_allocated_storage # gigabytes
+  parameter_group_name = "rds-mysql"
 
   engine         = "mysql"
   engine_version = "8.0.17"
   identifier     = var.rds_dbindentifier
-  instance_class = "db.t3.micro"
+  instance_class = "db.t2.small"
   multi_az       = false
   name           = var.rds_db_name
 
@@ -455,11 +462,12 @@ resource "aws_db_instance" "rds_ins" {
   username               = var.rds_dbusername
   skip_final_snapshot    = true
   vpc_security_group_ids = "${aws_security_group.database.*.id}"
+  storage_encrypted = true
 
   tags = {
     "Name" = "rds_ins"
   }
-
+  depends_on = [aws_db_parameter_group.default]
 }
 
 
@@ -867,12 +875,12 @@ resource "aws_security_group" "loadBalancer" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-    ingress {
+/*     ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-  }
+  } */
   egress {
     from_port   = 0
     to_port     = 0
@@ -900,10 +908,16 @@ resource "aws_lb" "application-Load-Balancer" {
   }
 }
 
+data "aws_acm_certificate" "aws_ssl_certificate" {
+  domain   = "${var.aws_profile_name}.${var.domain_Name}"
+  statuses = ["ISSUED"]
+}
+
 resource "aws_lb_listener" "webapp-Listener" {
   load_balancer_arn = "${aws_lb.application-Load-Balancer.arn}"
-  port              = "80"
-  protocol          = "HTTP"
+  port              = "443"
+  protocol          = "HTTPS"
+  certificate_arn   = "${data.aws_acm_certificate.aws_ssl_certificate.arn}"
   default_action {
     type             = "forward"
     target_group_arn = "${aws_lb_target_group.albTargetGroup.arn}"
